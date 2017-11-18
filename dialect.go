@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -56,6 +57,7 @@ type Dialect interface {
 	TableCheckSql(tableName string) (string, []interface{})
 
 	IsColumnExist(tableName string, colName string) (bool, error)
+	IsColumnExistContext(ctx context.Context, tableName string, colName string) (bool, error)
 
 	CreateTableSql(table *Table, tableName, storeEngine, charset string) string
 	DropTableSql(tableName string) string
@@ -150,10 +152,12 @@ func (db *Base) SupportDropIfExists() bool {
 func (db *Base) DropTableSql(tableName string) string {
 	return fmt.Sprintf("DROP TABLE IF EXISTS `%s`", tableName)
 }
-
 func (db *Base) HasRecords(query string, args ...interface{}) (bool, error) {
+	return db.HasRecordsContext(context.Background(), query, args...)
+}
+func (db *Base) HasRecordsContext(ctx context.Context, query string, args ...interface{}) (bool, error) {
 	db.LogSQL(query, args)
-	rows, err := db.DB().Query(query, args...)
+	rows, err := db.DB().QueryContext(ctx, query, args...)
 	if err != nil {
 		return false, err
 	}
@@ -164,11 +168,13 @@ func (db *Base) HasRecords(query string, args ...interface{}) (bool, error) {
 	}
 	return false, nil
 }
-
 func (db *Base) IsColumnExist(tableName, colName string) (bool, error) {
+	return db.IsColumnExistContext(context.Background(), tableName, colName)
+}
+func (db *Base) IsColumnExistContext(ctx context.Context, tableName, colName string) (bool, error) {
 	query := "SELECT `COLUMN_NAME` FROM `INFORMATION_SCHEMA`.`COLUMNS` WHERE `TABLE_SCHEMA` = ? AND `TABLE_NAME` = ? AND `COLUMN_NAME` = ?"
 	query = strings.Replace(query, "`", db.dialect.QuoteStr(), -1)
-	return db.HasRecords(query, db.DbName, tableName, colName)
+	return db.HasRecordsContext(ctx, query, db.DbName, tableName, colName)
 }
 
 /*
